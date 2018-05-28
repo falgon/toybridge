@@ -24,7 +24,7 @@ public:
     typedef SROOK_DEDUCED_TYPENAME srook::tmpl::vt::transfer<std::tuple, SROOK_DEDUCED_TYPENAME srook::tmpl::vt::replicate<max_devices, string_type>::type>::type tuple_type;
 
     template <class... Ts, 
-    SROOK_REQUIRES(srook::type_traits::detail::Land</*srook::is_constructible<string_type, SROOK_DEDUCED_TYPENAME decay<Ts>::type>...,*/ srook::bool_constant<sizeof...(Ts) == max_devices>>::value)>
+    SROOK_REQUIRES(srook::type_traits::detail::Land<srook::bool_constant<sizeof...(Ts) == max_devices>, srook::is_constructible<string_type, SROOK_DEDUCED_TYPENAME srook::decay<Ts>::type>...>::value)>
     SROOK_FORCE_INLINE SROOK_CONSTEXPR devinfo(Ts&&... ts) SROOK_NOEXCEPT_TRUE 
         : devices { srook::forward<Ts>(ts)... } 
     {}

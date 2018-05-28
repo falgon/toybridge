@@ -164,7 +164,7 @@ private:
         {
             T fs("/proc/sys/net/ipv4/ip_forward");
             if (fs.fail()) return srook::nullopt;
-            return { fs };
+            return { srook::move(fs) };
         }
         
         char ipfwd_backup;
