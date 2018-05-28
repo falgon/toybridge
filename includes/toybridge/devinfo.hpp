@@ -6,7 +6,7 @@
 #include <srook/string/string_view.hpp>
 #include <srook/type_traits/detail/logical.hpp>
 #include <srook/type_traits/decay.hpp>
-#include <srook/type_traits/is_convertible.hpp>
+#include <srook/type_traits/is_constructible.hpp>
 #include <srook/type_traits/bool_constant.hpp>
 #include <srook/type_traits/type_constant.hpp>
 #include <srook/tmpl/vt/transfer.hpp>
@@ -24,7 +24,7 @@ public:
     typedef SROOK_DEDUCED_TYPENAME srook::tmpl::vt::transfer<std::tuple, SROOK_DEDUCED_TYPENAME srook::tmpl::vt::replicate<max_devices, string_type>::type>::type tuple_type;
 
     template <class... Ts, 
-    SROOK_REQUIRES(srook::type_traits::detail::Land<srook::is_convertible<string_type, Ts>..., srook::bool_constant<sizeof...(Ts) == max_devices>>::value)>
+    SROOK_REQUIRES(srook::type_traits::detail::Land</*srook::is_constructible<string_type, SROOK_DEDUCED_TYPENAME decay<Ts>::type>...,*/ srook::bool_constant<sizeof...(Ts) == max_devices>>::value)>
     SROOK_FORCE_INLINE SROOK_CONSTEXPR devinfo(Ts&&... ts) SROOK_NOEXCEPT_TRUE 
         : devices { srook::forward<Ts>(ts)... } 
     {}
