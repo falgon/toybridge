@@ -62,7 +62,7 @@ SROOK_NOEXCEPT_TRUE
                 ::sockaddr a;
             } addr{};
             addr.sal.sll_family = PF_PACKET;
-            addr.sal.sll_protocol = htons(ETH_P_IP);
+            addr.sal.sll_protocol = htons(filter);
             addr.sal.sll_ifindex = ifr.ifr_ifindex;
 
             return toybridge::detail::bind(soc, &addr.a, sizeof(addr.sal)) >>= [&](int soc) -> srook::optional<int> {

@@ -6,7 +6,7 @@
 #include <srook/cstring/memcpy.hpp>
 #include <srook/iterator/ostream_joiner.hpp>
 #include <srook/range/adaptor/transformed.hpp>
-#include <srook/string/string_view.hpp>
+#include <srook/array.hpp>
 #include <linux/if_ether.h>
 #include <sstream>
 
@@ -21,21 +21,13 @@ SROOK_FORCE_INLINE std::ostream& title(std::ostream& os, const char* t, const ch
     return os;
 }
 
-SROOK_FORCE_INLINE std::ostream& macaddr_n2a(std::ostream& os, const ::u_char* hwaddr)
+template <std::size_t N>
+SROOK_FORCE_INLINE std::ostream& macaddr_n2a(std::ostream& os, const ::u_char (&hwaddr)[N])
 {
-    std::stringstream ostr;
-#if SROOK_CPP_LAMBDAS
-    SROOK_CXX17_CONSTEXPR auto l = [](::u_char c) SROOK_CXX17_CONSTEXPR -> int { return static_cast<int>(c); };
-#else
-    struct l_ {
-        SROOK_CXX17_CONSTEXPR SROOK_FORCE_INLINE int
-        operator()(::u_char c) const SROOK_NOEXCEPT_TRUE { return static_cast<int>(c); }
-    } l;
-#endif
-    srook::algorithm::copy(srook::string::basic_string_view<::u_char>(hwaddr, ETH_ALEN) | 
-            srook::range::adaptors::transformed(srook::move(l)),
-            srook::make_ostream_joiner(ostr << std::hex, ":"));
-    return os << ostr.str();
+    // TODO: quick implement
+    char buf[(N << 1) + 6]{};
+    std::snprintf(buf, sizeof(buf), "%02x:%02x:%02x:%02x:%02x:%02x", hwaddr[0], hwaddr[1], hwaddr[2], hwaddr[3], hwaddr[4], hwaddr[5]);
+    return os << buf;
 }
 
 std::ostream& out(std::ostream& os, const ::ether_header& eh)
@@ -43,15 +35,16 @@ std::ostream& out(std::ostream& os, const ::ether_header& eh)
     title(os, "ether_header", "-") << '\n';
     os << "\tdhost = ";
     macaddr_n2a(os, eh.ether_dhost) << '\n';
+    os << "\tshost = ";
     macaddr_n2a(os, eh.ether_shost) << '\n';
-    os << "\ttype = " << std::hex << ::ntohs(eh.ether_type) << std::dec;
+    os << "\ttype = " << std::hex << ntohs(eh.ether_type) << std::dec;
 
 #define TOYBRIDGE_ETHER_HEADER_OUT_CASE(CASE_, MESSAGE_)\
     case CASE_:\
         os << '(' << #MESSAGE_ << ")\n";\
         break
 
-    switch (::ntohs(eh.ether_type)) {
+    switch (ntohs(eh.ether_type)) {
         TOYBRIDGE_ETHER_HEADER_OUT_CASE(ETH_P_LOOP, LOOP);
         TOYBRIDGE_ETHER_HEADER_OUT_CASE(ETH_P_PUP, PUP);
         TOYBRIDGE_ETHER_HEADER_OUT_CASE(ETH_P_PUPAT, PUPAT);
@@ -173,9 +166,7 @@ SROOK_FORCE_INLINE bool dump(std::ostream& os, int devno, const ::u_char* data, 
     }
 
     ::ether_header eh {};
-    srook::cstring::memcpy(&eh, &data, sizeof(eh));
-    data += sizeof(::ether_header);
-    size -= sizeof(::ether_header);
+    srook::cstring::memcpy(&eh, data, sizeof(eh));
     if (is_verbose) {
         os << '[' << devno << ']';
         out(os, eh) << '\n';

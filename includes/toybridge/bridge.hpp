@@ -22,7 +22,7 @@ SROOK_INLINE_NAMESPACE(v1)
 
 class bridge {
 public:
-    SROOK_FORCE_INLINE bridge(const devinfo& di, srook::uint32_t filter = ETH_P_ALL, bool is_promiscous = false, bool is_verbose = false)
+    SROOK_FORCE_INLINE bridge(const devinfo& di, srook::uint32_t filter = ETH_P_ALL, bool is_promiscous = true, bool is_verbose = false)
         :bridged_(false), verbose_(srook::move(is_verbose)),
         sock1_(detail::init(get<0>(di), filter, is_promiscous)), 
         sock2_(detail::init(get<1>(di), filter, is_promiscous))
@@ -53,16 +53,19 @@ public:
                         targets[i].events = POLLIN | POLLERR;
                     });
 
-                    ::u_char buf[2048];
-                    for (int nready = ::poll(targets.data(), std::tuple_size<devinfo>::value, 100); 
+                    ::u_char buf[2048]{};
+                    SROOK_CONSTEXPR_OR_CONST int timeout = 100;
+                    for (int nready = ::poll(targets.data(), targets.size(), timeout); 
                             !end; 
-                            nready = ::poll(targets.data(), std::tuple_size<devinfo>::value, 100)) {
+                            nready = ::poll(targets.data(), targets.size(), timeout)) {
                         switch (nready) {
                             case -1:
                                 if (errno != EINTR) {
                                     srook::process::perror("poll");
                                     return srook::nullopt;
                                 }
+                                break;
+                            case 0:
                                 break;
                             default: {
                                 bool bt = false;
@@ -75,7 +78,7 @@ public:
                                             return;
                                         }
                                         ops = ops >>= [&bt, &buf, &i, &socks, &os, this](int s) -> srook::optional<int> {
-                                            if (detail::dump(os, i, buf, s, verbose_)){
+                                            if (detail::dump(os, i, buf, s, verbose_)) {
                                                 if (!this->write(socks[!i], buf, s)) { // TODO: This implementation allow only two devices.
                                                     bt = true;
                                                     srook::process::perror("write");
@@ -87,11 +90,10 @@ public:
                                         if (!ops) return; 
                                     }
                                 });
-                                if (bt) return srook::nullopt;
-                                break;
                             }
                         }
                     }
+                    return { soc1 };
                 }) >>= [&ipfwd](int sock) -> srook::optional<int> {
                     return ipfwd.undo() ? srook::make_optional(sock) : srook::nullopt;
                 };
