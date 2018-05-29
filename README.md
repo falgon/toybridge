@@ -1,5 +1,7 @@
 # toybridge
 
+[![Build Status](https://travis-ci.org/falgon/toybridge.svg?branch=master)](https://travis-ci.org/falgon/toybridge)
+
 The simply Linux network bridge implementation for learning.
 
 ## Requirements
