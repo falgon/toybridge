@@ -15,8 +15,5 @@ bridge: $(OUTS)
 $(OUTS): %.o: %.cpp
 	$(GXX) $(FLAGS) $(INCLUDE_PATH) $< -o $@
 
-run:
-	sudo ./dst/main.o
-
 clean:
 	$(RM) -r dst

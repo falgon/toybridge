@@ -10,6 +10,8 @@
 #include <srook/scope/unique_resource.hpp>
 #include <srook/array.hpp>
 #include <srook/type_traits/disjunction.hpp>
+#include <srook/type_traits/is_invocable.hpp>
+#include <srook/type_traits/decay.hpp>
 #include <poll.h>
 #include <signal.h>
 #include <stdarg.h>
@@ -40,7 +42,7 @@ public:
         ipfwd_config ipfwd;
 
         return bool(ipfwd.disable() >> [&]() -> srook::optional<int> {
-            regist_signal();
+            register_signal();
             return sock1_ >>= [&ipfwd, &os, this](int soc1) -> srook::optional<int> {
                 return (sock2_ >>= [&os, &soc1, this](int soc2) -> srook::optional<int> {
                     SROOK_ATTRIBUTE_UNUSED const auto rs1 = srook::scope::make_unique_resource(soc1, ::close);
@@ -53,7 +55,7 @@ public:
                         targets[i].events = POLLIN | POLLERR;
                     });
 
-                    ::u_char buf[2048]{};
+                    ::u_char buf[1 << 11]{};
                     SROOK_CONSTEXPR_OR_CONST int timeout = 100;
                     for (int nready = ::poll(targets.data(), targets.size(), timeout); 
                             !end; 
@@ -71,7 +73,7 @@ public:
                                 bool bt = false;
                                 srook::algorithm::for_each(srook::algorithm::make_counter(targets), [&bt, &buf, &socks, &os, this](const ::pollfd& t, std::size_t i) {
                                     if (t.revents & (POLLIN | POLLERR)) {
-                                        srook::optional<int> ops = this->read(socks[i], buf, sizeof(buf));
+                                        srook::optional<int> ops = io(::read, socks[i], buf, sizeof(buf));
                                         if (!ops) {
                                             bt = true;
                                             srook::process::perror("read");
@@ -79,7 +81,7 @@ public:
                                         }
                                         ops = ops >>= [&bt, &buf, &i, &socks, &os, this](int s) -> srook::optional<int> {
                                             if (detail::dump(os, i, buf, s, verbose_)) {
-                                                if (!this->write(socks[!i], buf, s)) { // TODO: This implementation allow only two devices.
+                                                if (!io(::write, socks[!i], buf, s)) { // TODO: This implementation allow only two devices.
                                                     bt = true;
                                                     srook::process::perror("write");
                                                     return srook::nullopt;
@@ -101,7 +103,7 @@ public:
         });
     }
 private:
-    SROOK_FORCE_INLINE void regist_signal() SROOK_NOEXCEPT_TRUE
+    SROOK_FORCE_INLINE void register_signal() SROOK_NOEXCEPT_TRUE
     {
         ::signal(SIGINT, end_signal);
         ::signal(SIGTERM, end_signal);
@@ -110,21 +112,15 @@ private:
         ::signal(SIGTTIN, SIG_IGN);
         ::signal(SIGTTOU, SIG_IGN);
     }
-    
-    SROOK_FORCE_INLINE srook::optional<int> 
-    read(int soc, ::u_char* buf, std::size_t len) SROOK_NOEXCEPT_TRUE
-    {
-        int size = ::read(srook::move(soc), buf, srook::move(len));
-        return size <= 0 ? srook::nullopt : srook::make_optional(size);
-    }
 
+    template <class F, SROOK_REQUIRES(srook::is_invocable<SROOK_DEDUCED_TYPENAME srook::decay<F>::type, int, ::u_char*, std::size_t>::value)>
     SROOK_FORCE_INLINE srook::optional<int>
-    write(int soc, ::u_char* buf, std::size_t len) SROOK_NOEXCEPT_TRUE
+    io(F&& fn, int soc, ::u_char* buf, std::size_t len) SROOK_NOEXCEPT_TRUE
     {
-        int size = ::write(srook::move(soc), buf, srook::move(len));
+        int size = fn(srook::move(soc), buf, srook::move(len));
         return size <= 0 ? srook::nullopt : srook::make_optional(size);
     }
-
+    
     struct ipfwd_config SROOK_FINAL {
         SROOK_CONSTEXPR SROOK_FORCE_INLINE ipfwd_config() SROOK_NOEXCEPT_TRUE
             : ipfwd_backup('1') {}
